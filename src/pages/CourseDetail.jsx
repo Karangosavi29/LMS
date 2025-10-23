@@ -1,94 +1,102 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import js from '../assets/js.png';
-import ML from '../assets/ML.png';
-import fullstack from '../assets/fullstack.png';
-import react from '../assets/react.png';
-
-const mockCourses = [
-  {
-    id: '1',
-    title: 'React for Beginners',
-    instructor: 'Jane Doe',
-    thumbnail: react,
-    description: 'Learn the basics of React, including components, hooks, and state.',
-    duration: '5 hours',
-    syllabus: [
-      'Introduction to React',
-      'JSX and Components',
-      'State and Props',
-      'Hooks Basics',
-      'Project Setup',
-    ],
-    previewVideo: 'https://www.youtube.com/embed/dGcsHMXbSOA', // Added preview video
-  },
-  {
-    id: '2',
-    title: 'Advanced JavaScript',
-    instructor: 'John Smith',
-    thumbnail:js,
-    description: 'Deep dive into JavaScript ES6+ features and asynchronous programming.',
-    duration: '8 hours',
-    syllabus: [
-      'ES6+ Features',
-      'Closures and Scope',
-      'Promises and Async/Await',
-      'Event Loop',
-      'Performance Optimization',
-    ],
-  },
-  {
-    id: '3',
-    title: "Machine Learning 101",
-    instructor: "Alex Brown",
-    thumbnail: ML,
-    description: "An introductory course to machine learning concepts, algorithms, and practical applications using Python.",
-    duration: "10 hours",
-    syllabus: [
-      "Introduction to Machine Learning",
-      "Supervised Learning",
-      "Unsupervised Learning",
-      "Feature Engineering",
-      "Model Evaluation and Validation",
-      "Working with Python Libraries (scikit-learn, pandas)",
-      "Project: Building a Simple ML Model"
-    ],
-  },
-  {
-    id: '4',
-    title: "Full Stack Development",
-    instructor: "Emma Wilson",
-    thumbnail:fullstack,
-    description: "Learn to build complete web applications from front-end to back-end with hands-on projects.",
-    duration: "12 hours",
-    syllabus: [
-      "Introduction to Web Development",
-      "HTML, CSS, and JavaScript Basics",
-      "Front-end Frameworks (React.js)",
-      "Back-end Development with Node.js and Express",
-      "Databases and REST APIs",
-      "Deployment and DevOps Basics",
-      "Capstone Project: Build a Full Stack App"
-    ],
-  }
-];
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 
 export default function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [course, setCourse] = useState(null);
+  const { user } = useAuth(); // contains user info (role, name, etc.)
 
+  const [course, setCourse] = useState(null);
+  const [lessons, setLessons] = useState([]);
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [enrolling, setEnrolling] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+
+  // ✅ Fetch course + enrollment + lessons
   useEffect(() => {
-    const found = mockCourses.find((c) => c.id === id);
-    setCourse(found || null);
-  }, [id]);
+    const fetchCourseData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+
+        // 1️⃣ Fetch course
+        const { data: courseData } = await axios.get(
+          `http://localhost:5000/api/courses/${id}`
+        );
+        setCourse(courseData);
+
+        // 2️⃣ Check enrollment (only if logged in)
+        if (token) {
+          const { data } = await axios.get(
+            `http://localhost:5000/api/courses/enrolled`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+
+          const enrolled = data.some((c) => c._id === id);
+          setIsEnrolled(enrolled);
+          if (enrolled) setMessage("🎓 You are enrolled in this course");
+        }
+
+        // 3️⃣ Fetch lessons if enrolled
+        if (token && isEnrolled) {
+          const { data: lessonsData } = await axios.get(
+            `http://localhost:5000/api/courses/${id}/lessons`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          setLessons(lessonsData);
+        }
+      } catch (error) {
+        console.error("Error loading course:", error);
+        setMessage("Error loading course details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCourseData();
+  }, [id, isEnrolled]);
+
+  // ✅ Enroll handler
+  const handleEnroll = async () => {
+    if (!user) {
+      setMessage("⚠️ Please login to enroll.");
+      return;
+    }
+
+    try {
+      setEnrolling(true);
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `http://localhost:5000/api/courses/${id}/enroll`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setIsEnrolled(true);
+      setMessage("🎉 Enrolled successfully!");
+    } catch (error) {
+      console.error("Enroll error:", error);
+      setMessage(
+        error.response?.data?.message || "Enrollment failed. Try again."
+      );
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  // ✅ Loading UI
+  if (loading) return <p className="text-center p-10">Loading course...</p>;
 
   if (!course) {
     return (
       <div className="p-6 text-center">
         <h2 className="text-xl font-semibold mb-4">Course not found</h2>
         <button
-          onClick={() => navigate('/courses')}
+          onClick={() => navigate("/courses")}
           className="text-blue-600 underline"
         >
           Back to Courses
@@ -100,7 +108,7 @@ export default function CourseDetail() {
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md">
       <img
-        src={course.thumbnail}
+        src={course.thumbnail || "https://via.placeholder.com/600x300"}
         alt={course.title}
         className="rounded-md w-full max-h-64 object-cover mb-6"
       />
@@ -108,72 +116,69 @@ export default function CourseDetail() {
         {course.title}
       </h1>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Instructor: <span className="font-medium">{course.instructor}</span>
+        Instructor:{" "}
+        <span className="font-medium">{course.instructor?.name}</span>
       </p>
-      <p className="text-gray-700 dark:text-gray-300 mb-6">{course.description}</p>
-      <p className="mb-4">
-        <strong>Duration:</strong> {course.duration}
+      <p className="text-gray-700 dark:text-gray-300 mb-6">
+        {course.description}
+      </p>
+      <p className="mb-2">
+        <strong>Category:</strong> {course.category}
+      </p>
+      <p className="mb-2">
+        <strong>Level:</strong> {course.level}
+      </p>
+      <p className="mb-6">
+        <strong>Price:</strong> ${course.price}
       </p>
 
-      {/* Preview Video */}
-      {course.previewVideo && (
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold mb-2">Course Preview</h3>
-          <div className="aspect-w-16 aspect-h-9">
-            <iframe
-              src={course.previewVideo}
-              title="Course Preview"
-              className="w-full h-64 rounded-md"
-              frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          </div>
+      {/* ✅ Show Enroll / Go to Course */}
+      {!isEnrolled ? (
+        <button
+          onClick={handleEnroll}
+          disabled={enrolling}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md"
+        >
+          {enrolling ? "Enrolling..." : "Enroll Now"}
+        </button>
+      ) : (
+        <button
+          onClick={() => navigate(`/course/${course._id}/player`)}
+          className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-md"
+        >
+          Go to Course
+        </button>
+      )}
+
+      {message && (
+        <p className="text-green-600 mt-4 text-center font-medium">{message}</p>
+      )}
+
+      {/* ✅ Instructor-only button */}
+      {user?.role === "instructor" && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => navigate(`/course/${course._id}/add-lesson`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-md"
+          >
+            + Add Lesson
+          </button>
         </div>
       )}
 
-      <h3 className="text-xl font-semibold mb-3">Syllabus</h3>
-      <ul className="list-disc list-inside mb-6 text-gray-700 dark:text-gray-300">
-        {course.syllabus.map((item, index) => (
-          <li key={index}>{item}</li>
-        ))}
-      </ul>
-
-      <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-md mb-10">
-        Enroll Now
-      </button>
-
-      {/* Related Courses */}
-      <div className="mt-10">
-        <h3 className="text-xl font-semibold mb-4">Related Courses</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mockCourses
-            .filter((c) => c.id !== course.id)
-            .slice(0, 3)
-            .map((related) => (
-              <div
-                key={related.id}
-                className="border rounded-md p-4 bg-gray-50 dark:bg-gray-700"
-              >
-                <img
-                  src={related.thumbnail}
-                  alt={related.title}
-                  className="w-full h-40 object-cover rounded mb-2"
-                />
-                <h4 className="text-lg font-semibold">{related.title}</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  Instructor: {related.instructor}
-                </p>
-                <button
-                  onClick={() => navigate(`/courseDetail/${related.id}`)}
-                  className="text-blue-600 underline text-sm"
-                >
-                  View Course
-                </button>
-              </div>
+      {/* ✅ Show Lessons */}
+      {isEnrolled && lessons.length > 0 && (
+        <>
+          <h3 className="text-xl font-semibold mt-6 mb-3">Lessons</h3>
+          <ul className="list-disc list-inside mb-6 text-gray-700 dark:text-gray-300">
+            {lessons.map((lesson) => (
+              <li key={lesson._id}>
+                {lesson.title} — {lesson.duration || "Unknown"}
+              </li>
             ))}
-        </div>
-      </div>
+          </ul>
+        </>
+      )}
     </div>
   );
 }

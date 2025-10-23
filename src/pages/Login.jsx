@@ -22,7 +22,9 @@ export default function Login() {
       });
 
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("role", res.data.user.role); // ✅ fixed
       setUser(res.data.user);
+
       navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed");
@@ -32,7 +34,9 @@ export default function Login() {
   return (
     <div className="flex justify-center items-center h-[80vh] bg-gray-100">
       <div className="bg-white shadow-md rounded-lg p-8 w-[90%] max-w-md">
-        <h2 className="text-2xl font-semibold mb-6 text-center text-blue-600">Login</h2>
+        <h2 className="text-2xl font-semibold mb-6 text-center text-blue-600">
+          Login
+        </h2>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 

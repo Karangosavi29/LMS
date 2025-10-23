@@ -9,7 +9,10 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import CoursePlayer from "./pages/CoursePlayer";
 import Profile from "./pages/Profile";
-import './index.css';
+import MyCourses from "./pages/MyCourses";
+import AddLesson from "./pages/AddLesson";
+
+import "./index.css";
 
 function App() {
   return (
@@ -24,11 +27,14 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/courseplayer/:id" element={<CoursePlayer />} />
+            <Route path="/course/:id/player" element={<CoursePlayer />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/Navbar" element={<Navbar />} />
             <Route path="/Footer" element={<Footer />} />
-            </Routes>
+            <Route path="/my-courses" element={<MyCourses />} />
+            <Route path="/course/:id/add-lesson" element={<AddLesson />} />
+
+          </Routes>
         </main>
         <Footer />
       </div>
